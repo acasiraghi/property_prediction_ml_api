@@ -84,7 +84,7 @@ with st.container(border = False, key = 'layout_container'):
             if not uploaded_file or not smiles_column or not id_column or not chosen_models:
                 st.button('Predict', use_container_width = True, key = 'predict_button_disabled', disabled = True)   
             else:
-                if st.button('Predict', use_container_width = True, key = 'predict_button_enabled'):
+                if st.button('Predict', use_container_width = True, type = 'primary', key = 'predict_button_enabled'):
                         payload_rows_df = molecules_df[[id_column, smiles_column]].rename(columns = {id_column: 'id', smiles_column: 'smiles'})
                         payload = {'config': {'models': chosen_models}, 'data': {'rows': payload_rows_df.to_dict(orient = 'records')}}
 
@@ -114,7 +114,12 @@ with st.container(border = False, key = 'layout_container'):
                 # need to join predictions with data in original csv!
 
                 with col2_2:
-                    with st.expander('Filters'):
+                    with st.expander('Search by ID', width = 'stretch'):
+                        id_string = st.text_input('Search one or more IDs, separated by comma', label_visibility = 'visible')
+                        id_list = [e.strip() for e in id_string.split(',') if e.strip()]
+                        #results_df = results_df[results_df[id_column].isin(id_list)]
+
+                    with st.expander('Numerical filters', width = 'stretch'):
                         
                         numeric_columns = results_df.select_dtypes(include='number').columns
 
@@ -124,8 +129,11 @@ with st.container(border = False, key = 'layout_container'):
                             if st.button('\+', width = 'stretch', type = 'tertiary'):
                                 st.session_state.number_of_filters += 1
 
-                        with st.container(border = False, height = 'stretch', key = 'filters_container', gap = 'medium'):        
-                            for i in range(min(st.session_state.number_of_filters, 5)):
+                            max_filters = 5
+                            st.session_state.number_of_filters = min(max(st.session_state.number_of_filters, 0), max_filters)
+
+                        with st.container(border = False, height = 'stretch', key = 'filters_container', gap = 'small'):        
+                            for i in range(st.session_state.number_of_filters):
 
                                 with st.container(border = True, horizontal = True, key = f'filter_{i}'):
                                     column_to_filter = st.selectbox('Select column to filter', 
@@ -148,12 +156,6 @@ with st.container(border = False, key = 'layout_container'):
                 with col2_1:
                     with st.container(border = True, height = 'stretch', key = 'df_container'):
                         # need to change col names back to original
-
-                        
-
-                        
-
-
                         st.data_editor(
                                         results_df,
                                         column_config = {'svg_datauri': st.column_config.ImageColumn(width = 'large')},
