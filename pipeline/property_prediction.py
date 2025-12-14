@@ -54,17 +54,20 @@ class PredictFlow(FlowSpec):
     def preprocess(self):
         """Preprocess input molecules: check validity, standardize structures, deduplicate"""
         processed_smiles = []
+        processed_ids = []
         skipped_smiles = []
         
-        for smiles in self.data_df['smiles']:
+        for smiles_id, smiles in zip(self.data_df['id'], self.data_df['smiles']):
             mol = Chem.MolFromSmiles(smiles)
             if mol is not None:
                 mol = standardize_mol(mol)
                 processed_smiles.append(Chem.MolToSmiles(mol))
+                processed_ids.append(smiles_id)
             else:
                 skipped_smiles.append(smiles)
                 
-        self.valid_smiles = list(set(processed_smiles))
+        self.valid_smiles = processed_smiles
+        self.valid_ids = processed_ids
         self.skipped_smiles = skipped_smiles
         self.next(self.featurize, foreach = 'model_configs')
 
@@ -94,8 +97,9 @@ class PredictFlow(FlowSpec):
 
     @step
     def join(self, inputs):
-        self.merge_artifacts(inputs, include = ['valid_smiles'])
-        self.results_df = pd.DataFrame(self.valid_smiles, columns = ['smiles'])
+        self.merge_artifacts(inputs, include = ['valid_ids', 'valid_smiles'])
+        self.results_df = pd.DataFrame({'id': self.valid_ids, 'smiles': self.valid_smiles})
+        #assert alignment?
         for inp in inputs:
             self.results_df[inp.model_name] = inp.predictions
         self.results_json = self.results_df.to_dict(orient = 'records')

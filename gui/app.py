@@ -92,6 +92,7 @@ with st.container(border = False, key = 'layout_container'):
 
                         if r.ok:
                             st.session_state.results_df = pd.DataFrame(r.json())
+                            st.session_state.results_df.rename(columns = {'id': id_column, 'smiles': smiles_column}, inplace = True)
                             st.session_state.request_error = None
                         else:
                             st.session_state.results_df = None
@@ -107,7 +108,7 @@ with st.container(border = False, key = 'layout_container'):
             with st.container(border = False, height = 'stretch', key = 'results_container'):
                 col2_1, col2_2 = st.columns([4, 2], gap = 'small')
                 results_df = st.session_state.results_df.copy()
-                results_df['svg_text'] = results_df['smiles'].apply(smiles_to_svg)
+                results_df['svg_text'] = results_df[smiles_column].apply(smiles_to_svg)
                 results_df['svg_datauri'] = results_df['svg_text'].apply(svg_to_datauri)
                 results_df.drop(columns = ['svg_text'], inplace = True)
                
@@ -116,8 +117,9 @@ with st.container(border = False, key = 'layout_container'):
                 with col2_2:
                     with st.expander('Search by ID', width = 'stretch'):
                         id_string = st.text_input('Search one or more IDs, separated by comma', label_visibility = 'visible')
-                        id_list = [e.strip() for e in id_string.split(',') if e.strip()]
-                        #results_df = results_df[results_df[id_column].isin(id_list)]
+                        if id_string:
+                            id_list = [e.strip() for e in id_string.split(',') if e.strip()]
+                            results_df = results_df[results_df[id_column].isin(id_list)]
 
                     with st.expander('Numerical filters', width = 'stretch'):
                         
