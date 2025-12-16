@@ -15,8 +15,10 @@ if 'number_of_filters' not in st.session_state:
     st.session_state.number_of_filters = 0
 
 st.set_page_config(layout = 'wide')
-st.header('Property Prediction')
-st.divider(width = 'stretch')
+# st.header('Property Prediction')
+# st.divider(width = 'stretch')
+
+#TODO: adjust layout with containers of set height
 
 with st.container(border = False, key = 'layout_container'):
     col1, col2 = st.columns([2, 6], gap = 'small')
@@ -49,9 +51,6 @@ with st.container(border = False, key = 'layout_container'):
                     index = None
                 )
 
-                # if smiles_column is not None:
-                #     st.success(f'Found {molecules_df[smiles_column].nunique()} unique SMILES.')
-            
         with st.container(border = True, key = 'container_3'):
             
             if not uploaded_file or not smiles_column or not id_column:
@@ -79,7 +78,6 @@ with st.container(border = False, key = 'layout_container'):
                     st.dataframe(specs_df, hide_index = True)
         
         with st.container(border = False, key = 'button_container'):
-
             if not uploaded_file or not smiles_column or not id_column or not chosen_models:
                 st.button('Predict', use_container_width = True, key = 'predict_button_disabled', disabled = True)   
             else:
@@ -122,7 +120,7 @@ with st.container(border = False, key = 'layout_container'):
                 results_df = results_df.merge(molecules_df.drop(columns = [smiles_column]), on = id_column)
                 # move SMILES column to end of df
                 results_df[smiles_column] = results_df.pop(smiles_column)
-                # drop svg string column 
+
                 results_df.drop(columns = ['svg_text'], inplace = True)
 
                 with col2_2:
@@ -168,16 +166,34 @@ with st.container(border = False, key = 'layout_container'):
 
                 with col2_1:
                     with st.container(border = True, height = 'stretch', key = 'df_container'):
-                        st.data_editor(
-                                        results_df,
-                                        column_config = {'Structure_SVG': st.column_config.ImageColumn(width = 'large')},
-                                        row_height = 110,
-                                        height = 580, 
-                                        hide_index = True,
-                                        disabled = True
-                                        )
                         
-                        # TODO: add checkbox columns to results to select rows
-                        # TODO: add select all/deselect all (st.segmented_control)
+                        selection_option = st.segmented_control(label = 'Selection options', 
+                                                                options = ['Select all', 'Deselect all'],
+                                                                label_visibility = 'collapsed',
+                                                                default = 'Select all'
+                                                                )
+                        
+                        if selection_option == 'Select all':
+                            col_selection_bool = True
+                        elif selection_option == 'Deselect all':
+                            col_selection_bool = False
+
+                        results_df.insert(0,
+                                        'Selected',
+                                        value = col_selection_bool,
+                                        allow_duplicates = True
+                                        )
+
+                        st.data_editor(results_df, 
+                                       column_config = {
+                                           'Structure_SVG': st.column_config.ImageColumn(width = 'large'), 
+                                           'Selected': st.column_config.CheckboxColumn(default = False, disabled = False)
+                                           },
+                                       row_height = 110,
+                                       height = 580, 
+                                       hide_index = True,
+                                       disabled = range(1, len(results_df.columns))
+                                       )
+                        
                         # TODO: download selected rows (or all rows)
 
