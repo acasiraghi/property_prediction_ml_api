@@ -15,97 +15,102 @@ if 'number_of_filters' not in st.session_state:
     st.session_state.number_of_filters = 0
 
 st.set_page_config(layout = 'wide')
-# st.header('Property Prediction')
-# st.divider(width = 'stretch')
+st.subheader('Property Prediction')
+st.divider(width = 'stretch')
 
 #TODO: adjust layout with containers of set height
 
-with st.container(border = False, key = 'layout_container'):
-    col1, col2 = st.columns([2, 6], gap = 'small')
+with st.container(border = False, key = 'layout_container', height = 'content'):
+    #col1, col2 = st.columns([2, 6], gap = 'small')
                                     
-    with col1:
-        with st.container(border = True, 
-                        key = 'container_1'):
-            uploaded_file = st.file_uploader('Choose a CSV file', type=['csv'])
+    #with col1:
+    with st.expander(label = '⚙ Settings', expanded = True, width = 'stretch'):
+        with st.container(border = False, horizontal = True, key = 'top_bar', height = 185):
+            col1_1, col1_2, col1_3, col1_4 = st.columns([3, 2, 4, 1], gap = 'small')
+            with col1_1:
+                with st.container(border = True, 
+                                key = 'container_1'):
+                    uploaded_file = st.file_uploader('Choose a CSV file', type=['csv'])
+            with col1_2:
+                with st.container(border = True, 
+                                    key = 'container_2',
+                                    gap = 'small'):
 
-        with st.container(border = True, 
-                            key = 'container_2',
-                            gap = 'small'):
+                    if not uploaded_file:
+                        st.selectbox(label = 'Select ID column', options = [''], disabled = True) 
+                        st.selectbox(label = 'Select SMILES column', options = [''], disabled = True)
+                        smiles_column = None
+                        id_column = None
 
-            if not uploaded_file:
-                st.selectbox(label = 'Select ID column', options = [''], disabled = True) 
-                st.selectbox(label = 'Select SMILES column', options = [''], disabled = True)
-                smiles_column = None
-                id_column = None
+                    else:
+                        molecules_df = pd.read_csv(uploaded_file)
+                        id_column = st.selectbox(
+                            label = 'Select ID column',
+                            options = molecules_df.columns,
+                            index = None
+                        )
+                        smiles_column = st.selectbox(
+                            label = 'Select SMILES column',
+                            options = molecules_df.columns,
+                            index = None
+                        )
+            with col1_3:
+                with st.container(border = True, key = 'container_3', horizontal = False, height = 'stretch', vertical_alignment = 'distribute'):
+                    
+                    if not uploaded_file or not smiles_column or not id_column:
+                        st.multiselect('Select models', options = [''], disabled = True)
+                        st.popover('Show models specs', width = 'stretch', disabled = True)
+                    else:
+                        with open('./config/model_configs.json') as f:
+                            model_configs = json.load(f)
+                        model_names = [c['name'] for c in model_configs]
+                        chosen_models = st.multiselect(
+                            "Select models",
+                            model_names,
+                            default = model_names,
+                            key = 'multiselect_models'
+                            )
 
-            else:
-                molecules_df = pd.read_csv(uploaded_file)
-                id_column = st.selectbox(
-                    label = 'Select ID column',
-                    options = molecules_df.columns,
-                    index = None
-                )
-                smiles_column = st.selectbox(
-                    label = 'Select SMILES column',
-                    options = molecules_df.columns,
-                    index = None
-                )
+                        specs_df = pd.DataFrame(model_configs)[['name', 'algorithm', 'r squared']]
+                                
+                        specs_df = (
+                            specs_df.style
+                                .applymap(lambda v: 'color: red;' if v < 0.4 else 'color: green;', subset=['r squared'])
+                                .format({'r squared':'{:,.2f}'})
+                        )
+                        with st.popover('Show models specs', width = 'stretch'):
+                            st.dataframe(specs_df, hide_index = True)
+            with col1_4:
+                with st.container(border = False, height = 'stretch', vertical_alignment = 'center', key = 'button_container'):
+                    if not uploaded_file or not smiles_column or not id_column or not chosen_models:
+                        st.button('Predict', width = 'stretch', disabled = True, key = 'predict_button_disabled')   
+                    else:
+                        if st.button('Predict', use_container_width = True, type = 'primary', key = 'predict_button_enabled'):
+                                payload_rows_df = molecules_df[[id_column, smiles_column]].rename(columns = {id_column: 'id', smiles_column: 'smiles'})
+                                payload = {'config': {'models': chosen_models}, 'data': {'rows': payload_rows_df.to_dict(orient = 'records')}}
 
-        with st.container(border = True, key = 'container_3'):
-            
-            if not uploaded_file or not smiles_column or not id_column:
-                st.multiselect('Select models', options = [''], disabled = True)
-                st.popover('Show models specs', width = 'stretch', disabled = True)
-            else:
-                with open('./config/model_configs.json') as f:
-                    model_configs = json.load(f)
-                model_names = [c['name'] for c in model_configs]
-                chosen_models = st.multiselect(
-                    "Select models",
-                    model_names,
-                    default = model_names,
-                    key = 'multiselect_models'
-                    )
+                                r = requests.post('http://127.0.0.1:8000/predict', json = payload)
 
-                specs_df = pd.DataFrame(model_configs)[['name', 'algorithm', 'r squared']]
-                        
-                specs_df = (
-                    specs_df.style
-                        .applymap(lambda v: 'color: red;' if v < 0.4 else 'color: green;', subset=['r squared'])
-                        .format({'r squared':'{:,.2f}'})
-                )
-                with st.popover('Show models specs', width = 'stretch'):
-                    st.dataframe(specs_df, hide_index = True)
-        
-        with st.container(border = False, key = 'button_container'):
-            if not uploaded_file or not smiles_column or not id_column or not chosen_models:
-                st.button('Predict', use_container_width = True, key = 'predict_button_disabled', disabled = True)   
-            else:
-                if st.button('Predict', use_container_width = True, type = 'primary', key = 'predict_button_enabled'):
-                        payload_rows_df = molecules_df[[id_column, smiles_column]].rename(columns = {id_column: 'id', smiles_column: 'smiles'})
-                        payload = {'config': {'models': chosen_models}, 'data': {'rows': payload_rows_df.to_dict(orient = 'records')}}
+                                if r.ok:
+                                    st.session_state.results_df = pd.DataFrame(r.json())
+                                    st.session_state.results_df.rename(columns = {'id': id_column, 'smiles': smiles_column}, inplace = True)
+                                    st.session_state.request_error = None
+                                else:
+                                    st.session_state.results_df = None
+                                    st.session_state.request_error = f'Request failed with status code {r.status_code}'
 
-                        r = requests.post('http://127.0.0.1:8000/predict', json = payload)
-
-                        if r.ok:
-                            st.session_state.results_df = pd.DataFrame(r.json())
-                            st.session_state.results_df.rename(columns = {'id': id_column, 'smiles': smiles_column}, inplace = True)
-                            st.session_state.request_error = None
-                        else:
-                            st.session_state.results_df = None
-                            st.session_state.request_error = f'Request failed with status code {r.status_code}'
-
-    with col2:
-    
+    #with col2:
+    with st.container(border = True, key = 'bottom_box', height = 800, vertical_alignment = 'center'):
         # TODO: add spinner when waiting for results
 
         if st.session_state.results_df is None and st.session_state.request_error is None: 
-            st.markdown('<div style="align-text: center; align-items: center; justify-content: center; display: flex; height: 520px;"> Load compounds and define settings to start predictions. </div>', unsafe_allow_html = True)
+            #st.markdown('<div style="align-text: center; align-items: center; justify-content: center; display: flex; height: 750px;"> Load compounds and define settings to start predictions. </div>', unsafe_allow_html = True)
+            st.write('Load compounds and define settings to start predictions.')
         elif st.session_state.request_error is not None:
             st.error(st.session_state.request_error)
         else:
-            with st.container(border = False, height = 'stretch', key = 'results_container'):
-                col2_1, col2_2 = st.columns([4, 2], gap = 'small')
+            with st.container(border = False, height = 800, key = 'results_container'):
+                
                 results_df = st.session_state.results_df.copy()
                 results_df['svg_text'] = results_df[smiles_column].apply(smiles_to_svg)
                 
@@ -122,14 +127,16 @@ with st.container(border = False, key = 'layout_container'):
                 results_df[smiles_column] = results_df.pop(smiles_column)
 
                 results_df.drop(columns = ['svg_text'], inplace = True)
-
+                
+                col2_1, col2_2 = st.columns([3, 1], gap = 'small')
                 with col2_2:
+                    st.space(32)
                     with st.expander('Search by ID', width = 'stretch'):
                         id_string = st.text_input('Search one or more IDs, separated by comma', label_visibility = 'visible')
                         if id_string:
                             id_list = [e.strip() for e in id_string.split(',') if e.strip()]
                             results_df = results_df[results_df[id_column].isin(id_list)]
-
+                    #st.space(3)
                     with st.expander('Numerical filters', width = 'stretch'):
                         
                         numeric_columns = results_df.select_dtypes(include='number').columns
@@ -140,10 +147,10 @@ with st.container(border = False, key = 'layout_container'):
                             if st.button('\+', width = 'stretch', type = 'tertiary'):
                                 st.session_state.number_of_filters += 1
 
-                            max_filters = 5
+                            max_filters = 4
                             st.session_state.number_of_filters = min(max(st.session_state.number_of_filters, 0), max_filters)
 
-                        with st.container(border = False, height = 'stretch', key = 'filters_container', gap = 'small'):        
+                        with st.container(border = False, height = 'stretch', key = 'filters_container', gap = 'small', vertical_alignment = 'distribute'):        
                             for i in range(st.session_state.number_of_filters):
 
                                 with st.container(border = True, horizontal = True, key = f'filter_{i}'):
@@ -165,35 +172,35 @@ with st.container(border = False, key = 'layout_container'):
                                     results_df = results_df[results_df[column_to_filter].between(*value_range)]
 
                 with col2_1:
-                    with st.container(border = True, height = 'stretch', key = 'df_container'):
+                    #with st.container(border = True, height = 'stretch', key = 'df_container'):
                         
-                        selection_option = st.segmented_control(label = 'Selection options', 
-                                                                options = ['Select all', 'Deselect all'],
-                                                                label_visibility = 'collapsed',
-                                                                default = 'Select all'
-                                                                )
-                        
-                        if selection_option == 'Select all':
-                            col_selection_bool = True
-                        elif selection_option == 'Deselect all':
-                            col_selection_bool = False
+                    selection_option = st.segmented_control(label = 'Selection options', 
+                                                            options = ['Select all', 'Deselect all'],
+                                                            label_visibility = 'collapsed',
+                                                            default = 'Select all'
+                                                            )
+                    
+                    if selection_option == 'Select all':
+                        col_selection_bool = True
+                    elif selection_option == 'Deselect all':
+                        col_selection_bool = False
 
-                        results_df.insert(0,
-                                        'Selected',
-                                        value = col_selection_bool,
-                                        allow_duplicates = True
-                                        )
+                    results_df.insert(0,
+                                    'Selected',
+                                    value = col_selection_bool,
+                                    allow_duplicates = True
+                                    )
 
-                        st.data_editor(results_df, 
-                                       column_config = {
-                                           'Structure_SVG': st.column_config.ImageColumn(width = 'large'), 
-                                           'Selected': st.column_config.CheckboxColumn(default = False, disabled = False)
-                                           },
-                                       row_height = 110,
-                                       height = 580, 
-                                       hide_index = True,
-                                       disabled = range(1, len(results_df.columns))
-                                       )
-                        
-                        # TODO: download selected rows (or all rows)
+                    st.data_editor(results_df, 
+                                    column_config = {
+                                        'Structure_SVG': st.column_config.ImageColumn(width = 'large'), 
+                                        'Selected': st.column_config.CheckboxColumn(default = False, disabled = False)
+                                        },
+                                    row_height = 120,
+                                    height = 640, 
+                                    hide_index = True,
+                                    disabled = range(1, len(results_df.columns))
+                                    )
+                    
+                    # TODO: download selected rows (or all rows)
 
