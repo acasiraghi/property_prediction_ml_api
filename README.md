@@ -10,3 +10,4 @@ The goal is to implement an end-to-end solution for the prediction of molecular 
 - an interactive GUI for uploading data and visualizing prediction results
 - an API connecting the GUI and the prediction pipeline
 
+In the current version, models and associated metrics are just placeholders. Model performance has not been optimized or evaluated and predictions are not reliable.

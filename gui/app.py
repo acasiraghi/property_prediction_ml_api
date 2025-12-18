@@ -74,27 +74,28 @@ with st.container(border = False, key = 'layout_container', height = 'content'):
                                 .format({'r squared':'{:,.2f}'})
                         )
                         with st.popover('Show models specs', width = 'stretch'):
+                            st.write('Placeholder with made up numbers')
                             st.dataframe(specs_df, hide_index = True)
             with col1_4:
                 with st.container(border = False, height = 'stretch', vertical_alignment = 'center', key = 'button_container'):
+
                     if not uploaded_file or not smiles_column or not id_column or not chosen_models:
                         st.button('Predict', icon = ':material/play_circle:', width = 'stretch', disabled = True, key = 'predict_button_disabled')   
+             
                     else:
                         if st.button('Predict', icon = ':material/play_circle:', use_container_width = True, type = 'primary', key = 'predict_button_enabled'):
-                                payload_rows_df = molecules_df[[id_column, smiles_column]].rename(columns = {id_column: 'id', smiles_column: 'smiles'})
-                                payload = {'config': {'models': chosen_models}, 'data': {'rows': payload_rows_df.to_dict(orient = 'records')}}
+                            payload_rows_df = molecules_df[[id_column, smiles_column]].rename(columns = {id_column: 'id', smiles_column: 'smiles'})
+                            payload = {'config': {'models': chosen_models}, 'data': {'rows': payload_rows_df.to_dict(orient = 'records')}}
 
-                                r = requests.post('http://127.0.0.1:8000/predict', json = payload)
+                            r = requests.post('http://127.0.0.1:8000/predict', json = payload)
 
-                                if r.ok:
-                                    st.session_state.results_df = pd.DataFrame(r.json())
-                                    st.session_state.results_df.rename(columns = {'id': id_column, 'smiles': smiles_column}, inplace = True)
-                                    st.session_state.request_error = None
-                                else:
-                                    st.session_state.results_df = None
-                                    st.session_state.request_error = f'Request failed with status code {r.status_code}'
-
-        # TODO: add spinner when waiting for results
+                            if r.ok:
+                                st.session_state.results_df = pd.DataFrame(r.json())
+                                st.session_state.results_df.rename(columns = {'id': id_column, 'smiles': smiles_column}, inplace = True)
+                                st.session_state.request_error = None
+                            else:
+                                st.session_state.results_df = None
+                                st.session_state.request_error = f'Request failed with status code {r.status_code}'
 
     if st.session_state.results_df is None and st.session_state.request_error is None: 
         with st.container(border = True, height = 780, vertical_alignment = 'center', horizontal_alignment = 'center', key = 'results_before_predict'):
@@ -154,8 +155,13 @@ with st.container(border = False, key = 'layout_container', height = 'content'):
 
                 with st.expander('Numerical filters', icon = ':material/filter_alt:', width = 'stretch', expanded = False):
                      
-                    numeric_columns = results_df.select_dtypes(include='number').columns
-                    # TODO: keep only columns where all values are not the same (or add error widget instead of slider)
+                    numeric_columns = (
+                                    results_df
+                                    .select_dtypes(include = 'number')
+                                    .loc[:, lambda df: df.nunique() > 1]   # cols need > 1 value for valid slider range
+                                    .columns
+                                    )
+
                     with st.container(border = False, horizontal = True):
                         
                         if st.button('\-', width = 'stretch', type = 'tertiary'):
@@ -223,6 +229,13 @@ with st.container(border = False, key = 'layout_container', height = 'content'):
                 csv_file = download_df.to_csv(index = False)
 
             with st.container(border = False, horizontal = True, height = 'stretch', vertical_alignment = 'center'):
-                st.caption(f'   Total {total_rows} | Visible {results_df.shape[0]} | Selected {selected_df.shape[0]}')
-                st.download_button(label = 'Download selected', data = csv_file, file_name = 'test.csv', type = 'primary', icon = ':material/download:')
+
+                st.caption(f'Total {total_rows} | Visible {results_df.shape[0]} | Selected {selected_df.shape[0]}')
+                st.download_button(
+                                label = 'Download selected', 
+                                data = csv_file, 
+                                file_name = f'{uploaded_file.name}_predictions.csv', 
+                                type = 'primary', 
+                                icon = ':material/download:'
+                                )
 
