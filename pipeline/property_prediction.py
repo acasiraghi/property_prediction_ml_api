@@ -110,7 +110,7 @@ class PredictFlow(FlowSpec):
 
     @step
     def end(self):
-        print('end')
+        print('Done')
 
 if __name__ == '__main__':
     PredictFlow()

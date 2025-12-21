@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from metaflow import Runner
 
@@ -17,12 +17,10 @@ app = FastAPI()
 @app.post('/predict')
 def run_pipeline(payload: PayLoad):
     with Runner('./pipeline/property_prediction.py').run(payload_json_string = payload.model_dump_json()) as running:
-        # TODO: pass errors from metaflow run status to GUI
-        # if running.status == 'failed':
-        #     message = f'{running.run} failed:'
-        # elif running.status == 'successful':
-        #      message = f'{running.run} succeeded:'
-        # print(f'{running.run} finished')
-        results = running.run.data.results_json
+        if running.status != 'successful':
+            # basic error handling: returns 500 on metaflow failure
+            # may be extended to include run_id or other info in details if needed
+            raise HTTPException(status_code = 500)
+        else:
+            results = running.run.data.results_json
     return results
-    #return {'message': message}
