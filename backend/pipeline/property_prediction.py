@@ -1,12 +1,13 @@
-from metaflow import FlowSpec, step, Parameter, JSONType
-from rdkit import Chem
-from rdkit.Chem import rdFingerprintGenerator
-from rdkit.Chem.MolStandardize import rdMolStandardize
-import pandas as pd 
-import numpy as np
 import joblib
 import json
 import copy
+from pathlib import Path
+import pandas as pd 
+import numpy as np
+from metaflow import FlowSpec, step, Parameter
+from rdkit import Chem
+from rdkit.Chem import rdFingerprintGenerator
+from rdkit.Chem.MolStandardize import rdMolStandardize
 
 def standardize_mol(mol):
     lfc = rdMolStandardize.LargestFragmentChooser()
@@ -20,7 +21,6 @@ def standardize_mol(mol):
     return mol
 
 class PredictFlow(FlowSpec):
-    
     payload_json_string = Parameter(
         'payload_json_string',
         help = 'The json string from the POST request.',
@@ -33,8 +33,10 @@ class PredictFlow(FlowSpec):
         self.payload = json.loads(self.payload_json_string)
         self.models = self.payload['config']['models']
         self.data_df = pd.DataFrame(self.payload['data']['rows'])
+        self.base_dir = Path(__file__).resolve().parent
 
-        with open('config/model_configs.json') as f:
+        config_path = self.base_dir / 'config' / 'model_configs.json'
+        with open(config_path) as f:
             self.model_configs = json.load(f)
         self.supported_models = [c['name'] for c in self.model_configs]
         
@@ -90,7 +92,8 @@ class PredictFlow(FlowSpec):
     def predict(self):
         """Load models and make predictions."""
         self.model_name = self.input['name']
-        model = joblib.load(f'./models/{self.model_name }.pickle')
+        model_path = self.base_dir / 'models' / f'{self.model_name}.pickle'
+        model = joblib.load(model_path)
         self.predictions = model.predict(self.features)
         self.next(self.join)
 
